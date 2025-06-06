@@ -1,0 +1,41 @@
+services:
+  hajimi-app: # 服务名，可自定义
+    image: beijixingxing/hajimi:latest
+    container_name: hajimi-app  # 固定容器名方便监控
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"  # 启用自动更新
+    ports:
+      - "7860:7860" # 端口映射：冒号左边是宿主机端口（可改），右边是容器内端口（固定7860）。
+                    # 如果 7860 端口冲突，修改冒号左边的数字，例如 "17860:7860"
+    env_file:
+      - .env  # 加载 .env 文件中的环境变量
+    environment:
+      - TZ=Asia/Shanghai # 时区配置，默认中国时区。如需修改，例如：America/New_York
+      - ENABLE_STORAGE=true # 应用层面的数据持久化开关，配合 volumes 使用
+
+      # --- 网络代理 (按需取消注释并修改) ---
+      # 如果需要 HTTP 代理:
+      # HTTP_PROXY: "http://your_proxy_address:port"  # <= 例如 "http://127.0.0.1:7890"
+      # 如果需要 HTTPS 代理 (通常与 HTTP 代理相同):
+      # HTTPS_PROXY: "http://your_proxy_address:port" # <= 例如 "http://127.0.0.1:7890"
+      # 注意：在 Windows/Mac 的 Docker Desktop 环境下，若代理在宿主机上，可尝试使用 "host.docker.internal"作为地址，
+      # 例如: HTTP_PROXY: "http://host.docker.internal:7890"
+      # 在 Linux 服务器上，请直接填写代理服务器的 IP 地址和端口。
+
+    volumes: # 数据持久化配置
+      - ./settings:/hajimi/settings # 将容器内的 /hajimi/settings 目录映射到当前项目文件夹下的 settings 子目录。
+                                   # 这会保存应用的所有重要配置和数据，即使容器更新或重启也不会丢失。
+                                   # 首次启动后，您会在 hajimi-app 文件夹下看到一个新创建的 settings 文件夹。
+    restart: unless-stopped # 容器退出时自动重启，除非是手动停止的。
+
+  # 🆙 自动更新监控服务（默认每小时检查一次）
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # 必须的Docker连接配置
+    environment:
+      - TZ=Asia/Shanghai # 时区配置
+      - WATCHTOWER_LABEL_ENABLE=true  # 只监控带有 "com.centurylinklabs.watchtower.enable=true" 标签的容器
+      - WATCHTOWER_POLL_INTERVAL=3600  # 检查间隔秒数（3600秒 = 1小时）
+      - WATCHTOWER_CLEANUP=true  # 更新后自动删除旧镜像
+    restart: unless-stopped
